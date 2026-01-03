@@ -19,7 +19,10 @@
     <div id="secao-tv" style="display: none;">
         <h1>Aguardando Jogadores...</h1>
         <ul id="lista-jogadores" style="list-style: none; font-size: 24px;"></ul>
-        <button onclick="executarSorteio()" style="padding: 15px; background: #e74c3c; color: white; border: none; cursor: pointer;">SORTEAR PAPÉIS</button>
+        
+        <button onclick="executarSorteio()" style="padding: 15px; background: #e74c3c; color: white;">SORTEAR PAPÉIS</button>
+        
+        <button onclick="limparSala()" style="padding: 15px; background: #95a5a6; color: white; margin-left: 10px;">LIMPAR SALA / RESET</button>
     </div>
 
     <div id="secao-jogador" style="display: none;">
@@ -113,6 +116,20 @@
                 });
             });
         }
+
+        function limparSala() {
+        if(confirm("Deseja realmente expulsar todos os jogadores e limpar a sala?")) {
+            db.ref('jogadores').remove()
+            .then(() => {
+                alert("Sala limpa com sucesso!");
+                // Opcional: recarregar a página para limpar estados locais
+                location.reload();
+            })
+            .catch((error) => {
+                console.error("Erro ao limpar:", error);
+            });
+        }
+    }
     </script>
 </body>
 </html>
