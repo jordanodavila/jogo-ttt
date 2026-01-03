@@ -1,22 +1,40 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-    <title>Teste de Conexão</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lobby do Jogo TTT</title>
+    
     <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-database-compat.js"></script>
 </head>
-<body style="text-align: center; font-family: sans-serif; transition: 0.5s;" id="corpo">
+<body style="font-family: sans-serif; text-align: center; background-color: #2c3e50; color: white;">
 
-    <h1>Status da Missão: <span id="status">Aguardando...</span></h1>
+    <div id="tela-escolha">
+        <h1>Como você quer entrar?</h1>
+        <button onclick="configurarTela('tv')" style="padding: 20px;">SOU O NOTEBOOK (TV)</button>
+        <button onclick="configurarTela('jogador')" style="padding: 20px;">SOU JOGADOR (CELULAR)</button>
+    </div>
 
-    <div id="controles-jogador">
-        <p>Você é o JOGADOR</p>
-        <button onclick="completarTarefa()" style="padding: 20px; font-size: 20px;">MARCAR TAREFA COMO FEITA</button>
-        <button onclick="resetar()" style="display:block; margin: 20px auto;">Resetar Jogo</button>
+    <div id="secao-tv" style="display: none;">
+        <h1>Aguardando Jogadores...</h1>
+        <ul id="lista-jogadores" style="list-style: none; font-size: 24px;"></ul>
+        <button onclick="executarSorteio()" style="padding: 15px; background: #e74c3c; color: white; border: none; cursor: pointer;">SORTEAR PAPÉIS</button>
+    </div>
+
+    <div id="secao-jogador" style="display: none;">
+        <div id="form-registro">
+            <h2>Digite seu nome:</h2>
+            <input type="text" id="nomeInput" style="padding: 10px;">
+            <button onclick="entrarNoLobby()">Entrar na Sala</button>
+        </div>
+        <div id="status-papel" style="display: none;">
+            <h2 id="texto-papel">Aguardando mestre sortear...</h2>
+        </div>
     </div>
 
     <script>
-        // --- COLE SEU CONFIG DO FIREBASE AQUI ---
+        // 1. COLI AQUI AS SUAS CONFIGURAÇÕES DO FIREBASE (AQUELA PARTE ROSA)
         const firebaseConfig = {
             apiKey: "AIzaSyCUGHV8Q1q-k61imb6oHabuqhkjUwdqrJo",
             authDomain: "jogo-ttt.firebaseapp.com",
@@ -25,35 +43,76 @@
             messagingSenderId: "97204447010",
             appId: "1:97204447010:web:289494bd07f5691878a77b"
         };
-        // ---------------------------------------
 
-        // Inicializa o Firebase
+        // Inicialização
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // FUNÇÃO DO JOGADOR (Envia para o servidor)
-        function completarTarefa() {
-            db.ref('partida/missao').set('COMPLETA');
-        }
-
-        function resetar() {
-            db.ref('partida/missao').set('PENDENTE');
-        }
-
-        // FUNÇÃO DA TV (Escuta o servidor)
-        db.ref('partida/missao').on('value', (snapshot) => {
-            const valor = snapshot.val();
-            const statusEl = document.getElementById('status');
-            const corpoEl = document.getElementById('corpo');
-
-            if (valor === 'COMPLETA') {
-                statusEl.innerText = "MISSÃO CONCLUÍDA! ✅";
-                corpoEl.style.backgroundColor = "#2ecc71"; // Verde
+        // Função para decidir o que mostrar na tela
+        function configurarTela(tipo) {
+            document.getElementById('tela-escolha').style.display = 'none';
+            if (tipo === 'tv') {
+                document.getElementById('secao-tv').style.display = 'block';
+                iniciarMonitoramentoTV();
             } else {
-                statusEl.innerText = "PENDENTE... ❌";
-                corpoEl.style.backgroundColor = "white";
+                document.getElementById('secao-jogador').style.display = 'block';
             }
-        });
+        }
+
+        // --- LÓGICA DO JOGADOR (CELULAR) ---
+        function entrarNoLobby() {
+            const nome = document.getElementById('nomeInput').value;
+            if(!nome) return alert("Digite um nome!");
+            
+            const meuId = "user_" + Math.floor(Math.random() * 10000);
+            localStorage.setItem('meuId_TTT', meuId);
+
+            db.ref('jogadores/' + meuId).set({ nome: nome, papel: "pendente" });
+
+            document.getElementById('form-registro').style.display = 'none';
+            document.getElementById('status-papel').style.display = 'block';
+
+            // Celular fica ouvindo se o papel mudou
+            db.ref('jogadores/' + meuId + '/papel').on('value', (snapshot) => {
+                const papel = snapshot.val();
+                if(papel === "TRAIDOR") {
+                    document.body.style.backgroundColor = "red";
+                    document.getElementById('texto-papel').innerText = "VOCÊ É O TRAIDOR!";
+                } else if(papel === "INOCENTE") {
+                    document.body.style.backgroundColor = "blue";
+                    document.getElementById('texto-papel').innerText = "VOCÊ É INOCENTE";
+                }
+            });
+        }
+
+        // --- LÓGICA DA TV (NOTEBOOK) ---
+        function iniciarMonitoramentoTV() {
+            db.ref('jogadores').on('value', (snapshot) => {
+                const lista = document.getElementById('lista-jogadores');
+                lista.innerHTML = "";
+                snapshot.forEach((child) => {
+                    const li = document.createElement('li');
+                    li.innerText = child.val().nome;
+                    lista.appendChild(li);
+                });
+            });
+        }
+
+        function executarSorteio() {
+            db.ref('jogadores').once('value', (snapshot) => {
+                const jogadores = [];
+                snapshot.forEach((child) => { jogadores.push({ id: child.key }); });
+
+                if(jogadores.length < 2) return alert("Precisa de 2 ou mais pessoas!");
+
+                const indiceTraidor = Math.floor(Math.random() * jogadores.length);
+                
+                jogadores.forEach((jog, index) => {
+                    const papelFinal = (index === indiceTraidor) ? "TRAIDOR" : "INOCENTE";
+                    db.ref('jogadores/' + jog.id).update({ papel: papelFinal });
+                });
+            });
+        }
     </script>
 </body>
 </html>
